@@ -2,6 +2,8 @@ import streamlit as st
 import tensorflow as tf
 from PIL import Image
 import numpy as np
+import os
+import gdown
 
 # Page configuration
 st.set_page_config(
@@ -13,12 +15,21 @@ st.set_page_config(
 st.title("🌿 Plant Disease Detection App")
 st.write("Upload an image of a plant leaf to detect potential diseases using your trained MobileNetV2 model.")
 
-# Load the model with caching so it only loads once
+# Configuration for downloading the model from Google Drive
+MODEL_PATH = "plant_disease_model.keras"
+# We combine your Google Drive file code into a direct download link
+FILE_URL = "https://drive.google.com/uc?export=download&id=1ZwezuGGoGzQxXJDoMsKGbxzNO_jISGXS"
+
 @st.cache_resource
 @tf.keras.utils.register_keras_serializable()
 def load_my_model():
-    # Make sure your saved model file in the repository matches this name
-    return tf.keras.models.load_model("plant_disease_model.keras", compile=False)
+    # If the model file isn't present in the app environment yet, download it
+    if not os.path.exists(MODEL_PATH):
+        with st.spinner("Downloading model from Google Drive... Please wait (this only happens once)."):
+            gdown.download(FILE_URL, MODEL_PATH, quiet=False)
+            
+    # Load the model without compilation errors
+    return tf.keras.models.load_model(MODEL_PATH, compile=False)
 
 try:
     model = load_my_model()
@@ -36,8 +47,7 @@ if uploaded_file is not None:
     
     st.write("Processing image...")
     
-    # Preprocess the image to match your model's expected input size
-    # Change (224, 224) if your model was trained on a different size (e.g., 128, 128)
+    # Preprocess the image to match MobileNetV2 input size (224x224)
     image = image.resize((224, 224))
     img_array = np.array(image)
     
@@ -48,7 +58,7 @@ if uploaded_file is not None:
         img_array = img_array[:, :, :3]
         
     img_array = np.expand_dims(img_array, axis=0)
-    img_array = img_array / 255.0  # Normalize if your training pipeline used 1/255.0 scaling
+    img_array = img_array / 255.0  # Normalize
 
     # Prediction button
     if st.button('Predict Disease'):
