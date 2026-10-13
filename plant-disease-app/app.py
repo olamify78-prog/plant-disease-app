@@ -14,16 +14,30 @@ MODEL_URL = "https://huggingface.co/kolex12/plant-disease-model/resolve/main/pla
 @st.cache_resource
 @tf.keras.utils.register_keras_serializable()
 def load_my_model():
-    if not os.path.exists(MODEL_PATH):
-        with st.spinner("Downloading model... Please wait."):
-            urllib.request.urlretrieve(MODEL_URL, MODEL_PATH)
+    # If file doesn't exist or is suspiciously small (less than 1MB), download it
+    if not os.path.exists(MODEL_PATH) or os.path.getsize(MODEL_PATH) < 1000000:
+        with st.spinner("Downloading model from Hugging Face... This may take a moment."):
+            try:
+                # Add a User-Agent header so Hugging Face allows the download
+                headers = {'User-Agent': 'Mozilla/5.0'}
+                req = urllib.request.Request(MODEL_URL, headers=headers)
+                with urllib.request.urlopen(req) as response, open(MODEL_PATH, 'wb') as out_file:
+                    out_file.write(response.read())
+            except Exception as e:
+                st.error(f"Download failed: {e}")
+                return None
+                
     return tf.keras.models.load_model(MODEL_PATH, compile=False)
 
 try:
     model = load_my_model()
-    st.success("Model loaded successfully!")
+    if model is not None:
+        st.success("Model loaded successfully!")
+    else:
+        st.stop()
 except Exception as e:
     st.error(f"Error loading model: {e}")
+    st.stop()
 
 uploaded_file = st.file_uploader("Choose a leaf image...", type=["jpg", "jpeg", "png"])
 
