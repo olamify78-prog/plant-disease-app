@@ -2,51 +2,46 @@ import streamlit as st
 import tensorflow as tf
 from PIL import Image
 import numpy as np
-import os
-import urllib.request
+from huggingface_hub import hf_hub_download
 
-st.set_page_config(page_title="Plant Disease Classifier", page_icon="🌿", layout="centered")
+st.set_page_config(
+    page_title="Plant Disease Classifier",
+    page_icon="🌿",
+    layout="centered"
+)
+
 st.title("🌿 Plant Disease Detection App")
-
-MODEL_PATH = "plant_disease_model.keras"
-MODEL_URL = "https://huggingface.co/kolex12/plant-disease-model/resolve/main/plant_disease_model.keras"
+st.write("Upload an image of a plant leaf to detect potential diseases using your trained MobileNetV2 model.")
 
 @st.cache_resource
 @tf.keras.utils.register_keras_serializable()
 def load_my_model():
-    # If file doesn't exist or is suspiciously small (less than 1MB), download it
-    if not os.path.exists(MODEL_PATH) or os.path.getsize(MODEL_PATH) < 1000000:
-        with st.spinner("Downloading model from Hugging Face... This may take a moment."):
-            try:
-                # Add a User-Agent header so Hugging Face allows the download
-                headers = {'User-Agent': 'Mozilla/5.0'}
-                req = urllib.request.Request(MODEL_URL, headers=headers)
-                with urllib.request.urlopen(req) as response, open(MODEL_PATH, 'wb') as out_file:
-                    out_file.write(response.read())
-            except Exception as e:
-                st.error(f"Download failed: {e}")
-                return None
-                
-    return tf.keras.models.load_model(MODEL_PATH, compile=False)
+    with st.spinner("Downloading model from Hugging Face... Please wait (this takes a moment on first boot)."):
+        # This automatically handles downloading the actual model binary from your repo
+        model_path = hf_hub_download(
+            repo_id="kolex12/plant-disease-model",
+            filename="plant_disease_model.keras"
+        )
+    return tf.keras.models.load_model(model_path, compile=False)
 
 try:
     model = load_my_model()
-    if model is not None:
-        st.success("Model loaded successfully!")
-    else:
-        st.stop()
+    st.success("Model loaded successfully!")
 except Exception as e:
     st.error(f"Error loading model: {e}")
     st.stop()
 
+# File uploader widget
 uploaded_file = st.file_uploader("Choose a leaf image...", type=["jpg", "jpeg", "png"])
 
 if uploaded_file is not None:
     image = Image.open(uploaded_file)
     st.image(image, caption='Uploaded Leaf Image', use_column_width=True)
     
+    st.write("Processing image...")
     image = image.resize((224, 224))
     img_array = np.array(image)
+    
     if img_array.ndim == 2:
         img_array = np.stack((img_array,)*3, axis=-1)
     elif img_array.shape[2] == 4:
