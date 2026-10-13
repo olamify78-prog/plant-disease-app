@@ -8,22 +8,27 @@ import os
 st.set_page_config(page_title="Plant Disease Classifier", page_icon="🌿", layout="centered")
 st.title("🌿 Plant Disease Detection App")
 
-# Your verified GitHub Release direct download link
 MODEL_URL = "https://github.com/olamify78-prog/plant-disease-app/releases/download/v1.0/plant_disease_model.keras"
 MODEL_PATH = "plant_disease_model.keras"
 
 @st.cache_resource
 @tf.keras.utils.register_keras_serializable()
 def load_my_model():
+    # Download the file if it doesn't exist or is too small (meaning download failed/partial)
     if not os.path.exists(MODEL_PATH) or os.path.getsize(MODEL_PATH) < 1000000:
-        with st.spinner("Downloading model from GitHub Releases... Please wait."):
+        with st.spinner("Downloading model from GitHub Releases (this may take a moment)..."):
             try:
                 urllib.request.urlretrieve(MODEL_URL, MODEL_PATH)
             except Exception as e:
-                st.error(f"Failed to download model: {e}")
+                st.error(f"Download failed: {e}")
                 return None
-                
-    return tf.keras.models.load_model(MODEL_PATH, compile=False)
+
+    # Double check that the file now exists before loading
+    if os.path.exists(MODEL_PATH):
+        return tf.keras.models.load_model(MODEL_PATH, compile=False)
+    else:
+        st.error("Model file could not be found after download attempt.")
+        return None
 
 try:
     model = load_my_model()
