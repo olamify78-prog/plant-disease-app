@@ -14,27 +14,29 @@ MODEL_PATH = os.path.abspath("plant_disease_model.keras")
 @st.cache_resource
 @tf.keras.utils.register_keras_serializable()
 def load_my_model():
-    # Force download if file doesn't exist or is too small to be a real model (< 1MB)
-    if not os.path.exists(MODEL_PATH) or os.path.getsize(MODEL_PATH) < 1000000:
-        with st.spinner("Downloading model from GitHub Releases..."):
+    # Download if file doesn't exist or is too small (< 500 KB)
+    if not os.path.exists(MODEL_PATH) or os.path.getsize(MODEL_PATH) < 500000:
+        with st.spinner("Downloading model from GitHub Releases... Please wait."):
             try:
-                headers = {'User-Agent': 'Mozilla/5.0'}
-                req = urllib.request.Request(MODEL_URL, headers=headers)
-                with urllib.request.urlopen(req) as response, open(MODEL_PATH, 'wb') as out_file:
-                    out_file.write(response.read())
+                urllib.request.urlretrieve(MODEL_URL, MODEL_PATH)
             except Exception as e:
-                st.error(f"Download failed: {e}")
+                st.error(f"Download exception: {e}")
                 return None
 
-    # Check if the file is actually an HTML error/redirect page instead of a binary zip
-    with open(MODEL_PATH, "rb") as f:
-        header_bytes = f.read(10)
-    
-    # A valid .keras file is a ZIP archive starting with 'PK' (Bytes: 50 4B)
-    if not header_bytes.startswith(b'PK'):
-        with open(MODEL_PATH, "r", errors="ignore") as f:
-            error_content = f.read(300)
-        st.error(f"Downloaded file is invalid (Not a ZIP/Keras file). Preview:\n\n{error_content}")
+    # Verify if the file is a valid ZIP archive (.keras files are ZIPs)
+    try:
+        with open(MODEL_PATH, "rb") as f:
+            header = f.read(4)
+        
+        # ZIP magic bytes are b'PK\x03\x04'
+        if header != b'PK\x03\x04':
+            with open(MODEL_PATH, "r", errors="ignore") as f:
+                content = f.read(400)
+            st.error(f"**Invalid Model File Downloaded:** GitHub returned a non-ZIP file (like a notebook or HTML page).\n\nContent preview:\n`{content}`")
+            os.remove(MODEL_PATH)
+            return None
+    except Exception as e:
+        st.error(f"Error checking file format: {e}")
         return None
 
     return tf.keras.models.load_model(MODEL_PATH, compile=False)
